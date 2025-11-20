@@ -1,2 +1,2 @@
-# homestuck-vocuabulary
+# homestuck-vocabulary
 Analyzes Homestuck vocabulary
