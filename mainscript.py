@@ -160,4 +160,77 @@ with open('homestuck_freq_modified.csv', 'w', newline='', encoding='utf-8') as o
 print('Wrote homestuck_freq_modified.csv with float proportions (relative to homestuck tokens).')
 
 
+
+
 ##########      COMPARE FREUQENCIES FROM HOMESTUCK TO UNIGRAM ##########
+
+# --- Find words overrepresented in Homestuck vs unigram baseline ---
+# Writes `overrepresented_words.csv` with: word, homestuck_prop, unigram_prop, ratio, homestuck_count, unigram_count
+def _read_modified_csv(path):
+    """Read a modified csv with header [word,count,proportion] and return dict(word->(count,prop))."""
+    d = {}
+    try:
+        with open(path, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            hdr = next(reader, None)
+            for row in reader:
+                if not row:
+                    continue
+                word = row[0]
+                count = 0
+                prop = 0.0
+                if len(row) > 1:
+                    try:
+                        count = int(row[1])
+                    except Exception:
+                        try:
+                            count = int(float(row[1]))
+                        except Exception:
+                            count = 0
+                if len(row) > 2:
+                    try:
+                        prop = float(row[2])
+                    except Exception:
+                        prop = 0.0
+                d[word] = (count, prop)
+    except FileNotFoundError:
+        return {}
+    return d
+
+
+unigram_mod = _read_modified_csv('unigram_freq_modified.csv')
+homestuck_mod = _read_modified_csv('homestuck_freq_modified.csv')
+
+over = []
+for word, (h_count, h_prop) in homestuck_mod.items():
+    u_count, u_prop = unigram_mod.get(word, (0, 0.0))
+    if u_prop <= 0.0:
+        if h_prop > 0.0:
+            ratio = float('inf')
+        else:
+            ratio = 0.0
+    else:
+        ratio = h_prop / u_prop
+    # Include words that are at least 100x more frequent in homestuck than unigram baseline
+    if ratio >= 100.0:
+        over.append((word, h_prop, u_prop, ratio, h_count, u_count))
+
+# Sort by ratio desc, then homestuck prop desc
+over_sorted = sorted(over, key=lambda x: (float('inf') if x[3]==float('inf') else -x[3], -x[1]))
+
+with open('overrepresented_words.csv', 'w', newline='', encoding='utf-8') as outf:
+    writer = csv.writer(outf)
+    writer.writerow(['word', 'homestuck_prop', 'unigram_prop', 'ratio', 'homestuck_count', 'unigram_count'])
+    for row in over_sorted:
+        # represent inf nicely
+        ratio_val = 'inf' if row[3] == float('inf') else ('{:.6g}'.format(row[3]))
+        writer.writerow([row[0], '{:.8g}'.format(row[1]), '{:.8g}'.format(row[2]), ratio_val, row[4], row[5]])
+
+print(f'Wrote overrepresented_words.csv ({len(over_sorted)} words with >=10x proportion).')
+if len(over_sorted) > 0:
+    print('Top 20 overrepresented words:')
+    for w, h, u, r, hc, uc in over_sorted[:20]:
+        r_str = 'inf' if r == float('inf') else '{:.2f}x'.format(r)
+        print(f"{w}: homestuck_prop={h:.6g}, unigram_prop={u:.6g}, ratio={r_str}, hom_count={hc}, uni_count={uc}")
+
+
